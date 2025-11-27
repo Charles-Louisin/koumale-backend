@@ -46,10 +46,60 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// Récupérer toutes les catégories distinctes
+// Récupérer toutes les catégories prédéfinies
 export const getCategories = async (req: Request, res: Response): Promise<void> => {
   try {
-    const categories = await Product.distinct('category');
+    const categories = [
+      "Électronique",
+      "Téléphones & Tablettes",
+      "Ordinateurs & Accessoires",
+      "TV & Audio",
+      "Appareils Photo & Caméras",
+      "Gaming & Consoles",
+      "Vêtements",
+      "Mode Femme",
+      "Mode Homme",
+      "Chaussures",
+      "Accessoires Mode",
+      "Maison & Jardin",
+      "Meubles",
+      "Décoration",
+      "Électroménager",
+      "Bricolage",
+      "Beauté & Santé",
+      "Parfums & Cosmétiques",
+      "Soins du Corps",
+      "Cheveux & Ongles",
+      "Santé & Bien-être",
+      "Alimentation",
+      "Épicerie",
+      "Boissons",
+      "Produits Bio",
+      "Sports & Loisirs",
+      "Équipement Sportif",
+      "Vélo & Moto",
+      "Camping & Randonnée",
+      "Jouets & Jeux",
+      "Livres & Médias",
+      "Livres",
+      "Musique & Films",
+      "Jeux Vidéo",
+      "Auto & Moto",
+      "Pièces Auto",
+      "Accessoires Auto",
+      "Équipement Moto",
+      "Bébé & Enfant",
+      "Vêtements Bébé",
+      "Puériculture",
+      "Jouets Enfant",
+      "Animaux",
+      "Alimentation Animaux",
+      "Accessoires Animaux",
+      "Jardinage",
+      "Outils & Matériel",
+      "Semences & Plantes",
+      "Autres"
+    ];
 
     res.status(200).json({
       success: true,

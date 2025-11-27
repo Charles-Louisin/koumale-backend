@@ -95,10 +95,12 @@ router.post('/check-business-name', async (req: express.Request, res: express.Re
       businessName: { $regex: new RegExp(`^${businessName.trim()}$`, 'i') }
     });
 
-    res.status(200).json({
-      success: true,
-      available: !existingVendor
-    });
+    if (existingVendor) {
+      res.status(400).json({ success: false, message: 'Nom d\'entreprise déjà utilisé' });
+      return;
+    }
+
+    res.status(200).json({ success: true });
   } catch (error: unknown) {
     res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });
   }
