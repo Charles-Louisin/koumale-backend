@@ -18,16 +18,15 @@ passport_1.default.use(new passport_google_oauth20_1.Strategy({
     callbackURL: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`,
     passReqToCallback: true
 }, async (req, accessToken, refreshToken, params, profile, done) => {
-    var _a, _b, _c, _d, _e, _f;
     try {
         // Vérifier si l'utilisateur existe déjà
-        let user = await User_2.default.findOne({ email: (_a = profile.emails) === null || _a === void 0 ? void 0 : _a[0].value });
+        let user = await User_2.default.findOne({ email: profile.emails?.[0].value });
         if (user) {
             // Utilisateur existe, mettre à jour les informations Google si nécessaire
             if (!user.googleId) {
                 user.googleId = profile.id;
-                user.firstName = user.firstName || ((_b = profile.name) === null || _b === void 0 ? void 0 : _b.givenName);
-                user.lastName = user.lastName || ((_c = profile.name) === null || _c === void 0 ? void 0 : _c.familyName);
+                user.firstName = user.firstName || profile.name?.givenName;
+                user.lastName = user.lastName || profile.name?.familyName;
                 await user.save();
             }
             return done(null, user);
@@ -35,9 +34,9 @@ passport_1.default.use(new passport_google_oauth20_1.Strategy({
         // Créer un nouvel utilisateur
         user = await User_2.default.create({
             googleId: profile.id,
-            email: (_d = profile.emails) === null || _d === void 0 ? void 0 : _d[0].value,
-            firstName: (_e = profile.name) === null || _e === void 0 ? void 0 : _e.givenName,
-            lastName: (_f = profile.name) === null || _f === void 0 ? void 0 : _f.familyName,
+            email: profile.emails?.[0].value,
+            firstName: profile.name?.givenName,
+            lastName: profile.name?.familyName,
             role: User_1.UserRole.CLIENT,
             status: 'approved'
         });

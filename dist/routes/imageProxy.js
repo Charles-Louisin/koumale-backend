@@ -12,7 +12,7 @@ const mongoose_1 = require("mongoose");
 const router = express_1.default.Router();
 const gfetch = globalThis.fetch;
 // Utilise soit gfetch s'il est disponible, sinon force le fetch global typé
-const fetchFn = gfetch !== null && gfetch !== void 0 ? gfetch : globalThis.fetch;
+const fetchFn = gfetch ?? globalThis.fetch;
 // Mapping basique content-type -> extension
 // On complète la map si nécessaire (ex: webp, svg, ...)
 const mimeExtMap = {

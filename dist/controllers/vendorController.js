@@ -42,14 +42,13 @@ const User_1 = __importStar(require("../models/User"));
 const Product_1 = __importDefault(require("../models/Product"));
 // Récupérer tous les vendeurs
 const getVendors = async (req, res) => {
-    var _a;
     try {
         // Pagination
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
         // Ne récupérer que les vendeurs approuvés
-        const q = (_a = req.query.q) === null || _a === void 0 ? void 0 : _a.trim();
+        const q = req.query.q?.trim();
         const textFilter = q ? {
             $or: [
                 { businessName: { $regex: q, $options: 'i' } },
@@ -89,7 +88,6 @@ const getVendors = async (req, res) => {
 exports.getVendors = getVendors;
 // Récupérer les vendeurs en attente d'approbation (pour admin)
 const getPendingVendors = async (req, res) => {
-    var _a;
     try {
         // Pagination
         const page = parseInt(req.query.page) || 1;
@@ -101,7 +99,7 @@ const getPendingVendors = async (req, res) => {
             status: User_1.UserStatus.PENDING
         }).select('_id');
         // Récupérer les vendeurs correspondants
-        const q = (_a = req.query.q) === null || _a === void 0 ? void 0 : _a.trim();
+        const q = req.query.q?.trim();
         const textFilter = q ? {
             $or: [
                 { businessName: { $regex: q, $options: 'i' } },

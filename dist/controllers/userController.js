@@ -38,14 +38,13 @@ const User_1 = __importStar(require("../models/User"));
 // GET /api/users
 // Réservé aux super admins
 const getUsers = async (req, res) => {
-    var _a;
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
         const role = req.query.role;
         const status = req.query.status;
-        const q = (_a = req.query.q) === null || _a === void 0 ? void 0 : _a.trim();
+        const q = req.query.q?.trim();
         const filter = {};
         if (role && Object.values(User_1.UserRole).includes(role)) {
             filter.role = role;
