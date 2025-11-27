@@ -74,7 +74,6 @@ const VendorSchema = new Schema<IVendor>(
   { timestamps: true }
 );
 
-// Index pour optimiser les recherches par vendorSlug
-VendorSchema.index({ vendorSlug: 1 });
+
 
 export default mongoose.model<IVendor>('Vendor', VendorSchema);

@@ -45,6 +45,10 @@ app.use('/api/image', imageProxy);
 app.get('/', (req, res) => {
   res.send('API Vendtout fonctionne correctement');
 });
+app.get("/env", (req, res) => {
+  res.send({ node_env: process.env.NODE_ENV });
+});
+
 
 // Connexion à MongoDB
 mongoose
