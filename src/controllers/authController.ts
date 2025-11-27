@@ -113,21 +113,30 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 // Inscription d'un vendeur
 export const registerVendor = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { 
-      email, 
-      password, 
+    const {
+      email,
+      password,
       firstName,
       lastName,
-      businessName, 
-      description, 
-      contactPhone, 
-      whatsappLink, 
-      telegramLink, 
+      businessName,
+      description,
+      contactPhone,
+      whatsappLink,
+      telegramLink,
       address,
       logo,
       coverImage,
       documents
     } = req.body;
+
+    // Vérifier si un vendeur avec ce nom d'entreprise existe déjà (insensible à la casse)
+    const existingVendor = await Vendor.findOne({
+      businessName: { $regex: new RegExp(`^${businessName.trim()}$`, 'i') }
+    });
+    if (existingVendor) {
+      res.status(400).json({ success: false, message: 'Un vendeur avec ce nom d\'entreprise existe déjà' });
+      return;
+    }
 
     // Vérifier si un utilisateur avec cet email existe déjà
     let user = await User.findOne({ email }).select('+password');

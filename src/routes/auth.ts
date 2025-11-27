@@ -5,6 +5,7 @@ import { register, login, registerVendor, getMe, approveVendor, rejectVendor, ge
 import { protect, authorize } from '../middleware/auth';
 import { UserRole } from '../models/User';
 import User, { IUser } from '../models/User';
+import Vendor from '../models/Vendor';
 
 const router = express.Router();
 
@@ -76,6 +77,30 @@ router.get('/google/callback', passport.authenticate('google', { failureRedirect
     res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}`);
   } catch (error) {
     res.redirect('/auth/login');
+  }
+});
+
+// Vérifier la disponibilité du nom d'entreprise
+router.post('/check-business-name', async (req: express.Request, res: express.Response) => {
+  try {
+    const { businessName } = req.body;
+
+    if (!businessName || !businessName.trim()) {
+      res.status(400).json({ success: false, message: 'Nom d\'entreprise requis' });
+      return;
+    }
+
+    // Vérifier si un vendeur avec ce nom d'entreprise existe déjà (insensible à la casse)
+    const existingVendor = await Vendor.findOne({
+      businessName: { $regex: new RegExp(`^${businessName.trim()}$`, 'i') }
+    });
+
+    res.status(200).json({
+      success: true,
+      available: !existingVendor
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });
   }
 });
 
