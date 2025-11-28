@@ -140,9 +140,26 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
       }
     }
 
-    // Recherche plein texte simple sur le nom
+    // Recherche flexible sur le nom (supporte les accents et les approximations)
     if (q && q.trim()) {
-      filter.name = { $regex: q.trim(), $options: 'i' };
+      const normalizedQuery = q.trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
+        .replace(/[^a-z0-9\s]/g, ' ') // Remplacer les caractères spéciaux par des espaces
+        .replace(/\s+/g, ' ') // Normaliser les espaces
+        .trim();
+
+      // Créer une regex flexible qui accepte les approximations
+      const words = normalizedQuery.split(' ').filter(word => word.length > 0);
+      const regexPatterns = words.map(word => {
+        // Pour chaque mot, créer un pattern qui accepte des variations
+        return new RegExp(word.split('').join('.*'), 'i');
+      });
+
+      // Recherche sur le nom normalisé et le nom original
+      filter.$or = [
+        { name: { $regex: regexPatterns.map(r => r.source).join('.*'), $options: 'i' } },
+        { name: { $regex: normalizedQuery.split('').join('.*'), $options: 'i' } }
+      ];
     }
 
     // Filtrer par attributs personnalisés

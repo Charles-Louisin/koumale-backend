@@ -80,4 +80,7 @@ const ProductSchema = new Schema<IProduct>(
 // Index pour optimiser les recherches par vendeur et catégorie
 ProductSchema.index({ vendor: 1, category: 1 });
 
+// Index de recherche textuelle pour le nom du produit
+ProductSchema.index({ name: 'text' });
+
 export default mongoose.model<IProduct>('Product', ProductSchema);
