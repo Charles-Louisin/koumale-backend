@@ -113,7 +113,7 @@ export const getCategories = async (req: Request, res: Response): Promise<void> 
 // Récupérer tous les produits (avec filtres optionnels)
 export const getProducts = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { category, vendorSlug, minPrice, maxPrice, q, promotion, ...attributes } = req.query as Record<string, string>;
+    const { category, vendorSlug, minPrice, maxPrice, q, promotion, address, minRating, isNew, ...attributes } = req.query as Record<string, string>;
 
     // Construire le filtre de recherche
     const filter: Record<string, unknown> = {};
@@ -127,6 +127,31 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
     // Filtre pour les produits en promotion
     if (promotion === 'true') {
       filter.promotionalPrice = { $exists: true, $ne: null, $gt: 0 };
+    }
+
+    // Filtre pour les produits nouveaux
+    if (isNew) {
+      const now = new Date();
+      let dateFilter: Date;
+
+      switch (isNew) {
+        case '1week':
+          dateFilter = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '1month':
+          dateFilter = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case '3months':
+          dateFilter = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case '6months':
+          dateFilter = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          dateFilter = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // Default to 1 month
+      }
+
+      filter.createdAt = { $gte: dateFilter };
     }
 
     // Si un vendorSlug est fourni, récupérer l'ID du vendeur
@@ -174,25 +199,156 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
-    // Exécuter la requête
-    const products = await Product.find(filter)
-      .populate('vendor', 'businessName vendorSlug')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    // Préparer la requête d'agrégation pour inclure les filtres avancés
+    const aggregationPipeline: any[] = [
+      // Étape 1: Filtrer les produits de base
+      { $match: filter },
 
-    const total = await Product.countDocuments(filter);
+      // Étape 2: Joindre avec les vendeurs pour les filtres d'adresse
+      {
+        $lookup: {
+          from: 'vendors',
+          localField: 'vendor',
+          foreignField: '_id',
+          as: 'vendor'
+        }
+      },
+      { $unwind: '$vendor' },
+
+      // Étape 3: Filtrer par adresse si fourni
+      ...(address ? [{
+        $match: {
+          'vendor.address': { $regex: address, $options: 'i' }
+        }
+      }] : []),
+
+      // Étape 4: Joindre avec les avis pour calculer la note moyenne
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'product',
+          as: 'reviews'
+        }
+      },
+
+      // Étape 5: Calculer la note moyenne et filtrer par note minimale si fourni
+      {
+        $addFields: {
+          averageRating: {
+            $cond: {
+              if: { $gt: [{ $size: '$reviews' }, 0] },
+              then: { $avg: '$reviews.rating' },
+              else: 0
+            }
+          },
+          reviewCount: { $size: '$reviews' }
+        }
+      },
+
+      // Étape 6: Filtrer par note minimale si fourni
+      ...(minRating ? [{
+        $match: {
+          averageRating: { $gte: Number(minRating) }
+        }
+      }] : []),
+
+      // Étape 7: Projeter les champs nécessaires
+      {
+        $project: {
+          name: 1,
+          description: 1,
+          price: 1,
+          promotionalPrice: 1,
+          category: 1,
+          attributes: 1,
+          images: 1,
+          isActive: 1,
+          views: 1,
+          clicks: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          vendor: {
+            businessName: '$vendor.businessName',
+            vendorSlug: '$vendor.vendorSlug',
+            address: '$vendor.address'
+          },
+          averageRating: 1,
+          reviewCount: 1
+        }
+      },
+
+      // Étape 8: Trier par date de création décroissante
+      { $sort: { createdAt: -1 } },
+
+      // Étape 9: Pagination
+      { $skip: skip },
+      { $limit: limit }
+    ];
+
+    // Compter le nombre total de documents (avec les mêmes filtres)
+    const countPipeline = [
+      // Même étapes que ci-dessus mais sans $skip, $limit et $project
+      { $match: filter },
+      {
+        $lookup: {
+          from: 'vendors',
+          localField: 'vendor',
+          foreignField: '_id',
+          as: 'vendor'
+        }
+      },
+      { $unwind: '$vendor' },
+      ...(address ? [{
+        $match: {
+          'vendor.address': { $regex: address, $options: 'i' }
+        }
+      }] : []),
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'product',
+          as: 'reviews'
+        }
+      },
+      {
+        $addFields: {
+          averageRating: {
+            $cond: {
+              if: { $gt: [{ $size: '$reviews' }, 0] },
+              then: { $avg: '$reviews.rating' },
+              else: 0
+            }
+          }
+        }
+      },
+      ...(minRating ? [{
+        $match: {
+          averageRating: { $gte: Number(minRating) }
+        }
+      }] : []),
+      { $count: 'total' }
+    ];
+
+    // Exécuter les deux pipelines
+    const [productsResult, countResult] = await Promise.all([
+      Product.aggregate(aggregationPipeline),
+      Product.aggregate(countPipeline)
+    ]);
+
+    const total = countResult[0]?.total || 0;
 
     res.status(200).json({
       success: true,
-      count: products.length,
+      count: productsResult.length,
       total,
       pagination: {
         page,
         limit,
         totalPages: Math.ceil(total / limit)
       },
-      data: products
+      data: productsResult
     });
   } catch (error: unknown) {
     res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });

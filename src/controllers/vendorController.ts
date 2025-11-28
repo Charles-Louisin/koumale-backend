@@ -13,43 +13,195 @@ export const getVendors = async (req: Request, res: Response): Promise<void> => 
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
-    
-    // Ne récupérer que les vendeurs approuvés
+
+    // Filtres
     const q = (req.query.q as string | undefined)?.trim();
+    const address = (req.query.address as string | undefined)?.trim();
+    const minRating = req.query.minRating ? Number(req.query.minRating) : undefined;
+    const sortBy = req.query.sortBy as string || 'newest';
+
+    // Filtre de recherche textuelle
     const textFilter: Record<string, unknown> = q ? {
       $or: [
         { businessName: { $regex: q, $options: 'i' } },
         { vendorSlug: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
       ]
     } : {};
 
-    const vendors = await Vendor.find(textFilter)
-      .populate({
-        path: 'user',
-        select: 'status',
-        match: { status: UserStatus.APPROVED }
-      })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-    
-    // Filtrer les vendeurs dont l'utilisateur n'est pas approuvé
-    const approvedVendors = vendors.filter(vendor => vendor.user);
-    
-    const total = await Vendor.countDocuments({
-      user: { $in: await User.find({ status: UserStatus.APPROVED, role: UserRole.VENDOR }).select('_id') }
-    });
-    
+    // Filtre par adresse
+    if (address) {
+      textFilter.address = { $regex: address, $options: 'i' };
+    }
+
+    // Préparer la requête d'agrégation pour inclure les filtres avancés
+    const aggregationPipeline: any[] = [
+      // Étape 1: Filtrer les vendeurs de base
+      { $match: textFilter },
+
+      // Étape 2: Joindre avec les utilisateurs pour vérifier le statut approuvé
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+
+      // Étape 3: Filtrer seulement les vendeurs approuvés
+      { $match: { 'user.status': UserStatus.APPROVED, 'user.role': UserRole.VENDOR } },
+
+      // Étape 4: Joindre avec les produits du vendeur
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: 'vendor',
+          as: 'products'
+        }
+      },
+
+      // Étape 5: Joindre avec les avis des produits pour calculer la note moyenne
+      {
+        $lookup: {
+          from: 'reviews',
+          let: { productIds: '$products._id' },
+          pipeline: [
+            { $match: { $expr: { $in: ['$product', '$$productIds'] } } }
+          ],
+          as: 'productReviews'
+        }
+      },
+
+      // Étape 6: Calculer la note moyenne des produits et compter les produits
+      {
+        $addFields: {
+          averageRating: {
+            $cond: {
+              if: { $gt: [{ $size: '$productReviews' }, 0] },
+              then: { $avg: '$productReviews.rating' },
+              else: null
+            }
+          },
+          reviewCount: { $size: '$productReviews' },
+          productCount: { $size: '$products' }
+        }
+      },
+
+      // Étape 6: Filtrer par note minimale si fourni
+      ...(minRating ? [{
+        $match: {
+          averageRating: { $gte: minRating }
+        }
+      }] : []),
+
+      // Étape 7: Projeter les champs nécessaires
+      {
+        $project: {
+          vendorSlug: 1,
+          businessName: 1,
+          description: 1,
+          contactPhone: 1,
+          whatsappLink: 1,
+          telegramLink: 1,
+          address: 1,
+          latitude: 1,
+          longitude: 1,
+          logo: 1,
+          coverImage: 1,
+          documents: 1,
+          createdAt: 1,
+          averageRating: 1,
+          reviewCount: 1,
+          productCount: 1,
+          user: {
+            status: '$user.status'
+          }
+        }
+      },
+
+      // Étape 8: Trier selon le critère demandé
+      sortBy === 'popular' ? { $sort: { reviewCount: -1, averageRating: -1, productCount: -1 } } : { $sort: { createdAt: -1 } },
+
+      // Étape 9: Pagination
+      { $skip: skip },
+      { $limit: limit }
+    ];
+
+    // Compter le nombre total de documents (avec les mêmes filtres)
+    const countPipeline = [
+      // Même étapes que ci-dessus mais sans $skip, $limit et $project
+      { $match: textFilter },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+      { $match: { 'user.status': UserStatus.APPROVED, 'user.role': UserRole.VENDOR } },
+      // Joindre avec les produits du vendeur
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: 'vendor',
+          as: 'products'
+        }
+      },
+      // Joindre avec les avis des produits pour calculer la note moyenne
+      {
+        $lookup: {
+          from: 'reviews',
+          let: { productIds: '$products._id' },
+          pipeline: [
+            { $match: { $expr: { $in: ['$product', '$$productIds'] } } }
+          ],
+          as: 'productReviews'
+        }
+      },
+      // Calculer la note moyenne des produits
+      {
+        $addFields: {
+          averageRating: {
+            $cond: {
+              if: { $gt: [{ $size: '$productReviews' }, 0] },
+              then: { $avg: '$productReviews.rating' },
+              else: null
+            }
+          }
+        }
+      },
+      ...(minRating ? [{
+        $match: {
+          averageRating: { $gte: minRating }
+        }
+      }] : []),
+      { $count: 'total' }
+    ];
+
+    // Exécuter les deux pipelines
+    const [vendorsResult, countResult] = await Promise.all([
+      Vendor.aggregate(aggregationPipeline),
+      Vendor.aggregate(countPipeline)
+    ]);
+
+    const total = countResult[0]?.total || 0;
+
     res.status(200).json({
       success: true,
-      count: approvedVendors.length,
+      count: vendorsResult.length,
       total,
       pagination: {
         page,
         limit,
         totalPages: Math.ceil(total / limit)
       },
-      data: approvedVendors
+      data: vendorsResult
     });
   } catch (error: unknown) {
     res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });
@@ -107,22 +259,97 @@ export const getPendingVendors = async (req: Request, res: Response): Promise<vo
 export const getVendorBySlug = async (req: Request, res: Response): Promise<void> => {
   try {
     const { slug } = req.params;
-    
-    const vendor = await Vendor.findOne({ vendorSlug: slug })
-      .populate('user', 'email status');
-    
-    if (!vendor) {
+
+    // Utiliser l'agrégation pour calculer la note moyenne
+    const vendorResult = await Vendor.aggregate([
+      // Étape 1: Filtrer le vendeur par slug
+      { $match: { vendorSlug: slug } },
+
+      // Étape 2: Joindre avec les utilisateurs pour vérifier le statut approuvé
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+
+      // Étape 3: Filtrer seulement les vendeurs approuvés
+      { $match: { 'user.status': UserStatus.APPROVED, 'user.role': UserRole.VENDOR } },
+
+      // Étape 4: Joindre avec les produits du vendeur
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: 'vendor',
+          as: 'products'
+        }
+      },
+
+      // Étape 5: Joindre avec les avis des produits pour calculer la note moyenne
+      {
+        $lookup: {
+          from: 'reviews',
+          let: { productIds: '$products._id' },
+          pipeline: [
+            { $match: { $expr: { $in: ['$product', '$$productIds'] } } }
+          ],
+          as: 'productReviews'
+        }
+      },
+
+      // Étape 6: Calculer la note moyenne des produits et compter les produits
+      {
+        $addFields: {
+          averageRating: {
+            $cond: {
+              if: { $gt: [{ $size: '$productReviews' }, 0] },
+              then: { $avg: '$productReviews.rating' },
+              else: 0
+            }
+          },
+          reviewCount: { $size: '$productReviews' },
+          productCount: { $size: '$products' }
+        }
+      },
+
+      // Étape 7: Projeter les champs nécessaires
+      {
+        $project: {
+          vendorSlug: 1,
+          businessName: 1,
+          description: 1,
+          contactPhone: 1,
+          whatsappLink: 1,
+          telegramLink: 1,
+          address: 1,
+          latitude: 1,
+          longitude: 1,
+          logo: 1,
+          coverImage: 1,
+          documents: 1,
+          createdAt: 1,
+          averageRating: 1,
+          reviewCount: 1,
+          productCount: 1,
+          user: {
+            status: '$user.status',
+            email: '$user.email'
+          }
+        }
+      }
+    ]);
+
+    if (!vendorResult || vendorResult.length === 0) {
       res.status(404).json({ success: false, message: 'Vendeur non trouvé' });
       return;
     }
-    
-    // Vérifier si le vendeur est approuvé
-    const user = vendor.user as { status: UserStatus };
-    if (user.status !== UserStatus.APPROVED) {
-      res.status(403).json({ success: false, message: 'Ce vendeur est en attente d\'approbation' });
-      return;
-    }
-    
+
+    const vendor = vendorResult[0];
+
     res.status(200).json({
       success: true,
       data: vendor
