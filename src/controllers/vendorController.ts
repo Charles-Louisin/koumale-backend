@@ -85,7 +85,13 @@ export const getVendors = async (req: Request, res: Response): Promise<void> => 
               else: null
             }
           },
-          reviewCount: { $size: '$productReviews' },
+          reviewCount: {
+            $cond: {
+              if: { $gt: [{ $size: '$productReviews' }, 0] },
+              then: { $size: '$productReviews' },
+              else: null
+            }
+          },
           productCount: { $size: '$products' }
         }
       },
@@ -308,7 +314,7 @@ export const getVendorBySlug = async (req: Request, res: Response): Promise<void
             $cond: {
               if: { $gt: [{ $size: '$productReviews' }, 0] },
               then: { $avg: '$productReviews.rating' },
-              else: 0
+              else: null
             }
           },
           reviewCount: { $size: '$productReviews' },
@@ -451,43 +457,106 @@ export const getVendorStats = async (req: Request, res: Response): Promise<void>
 export const getVendorProducts = async (req: Request, res: Response): Promise<void> => {
   try {
     const { slug } = req.params;
-    
+
     // Récupérer le vendeur
     const vendor = await Vendor.findOne({ vendorSlug: slug });
-    
+
     if (!vendor) {
       res.status(404).json({ success: false, message: 'Vendeur non trouvé' });
       return;
     }
-    
+
     // Pagination
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
-    
+
     // Filtres optionnels
     const { category } = req.query;
     const filter: Record<string, unknown> = { vendor: vendor._id as Types.ObjectId };
     if (category) filter.category = category;
-    
-    // Récupérer les produits
-    const products = await Product.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-    
-    const total = await Product.countDocuments(filter);
-    
+
+    // Préparer la requête d'agrégation pour inclure les avis
+    const aggregationPipeline: any[] = [
+      // Étape 1: Filtrer les produits de base
+      { $match: filter },
+
+      // Étape 2: Joindre avec les avis pour calculer la note moyenne
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'product',
+          as: 'reviews'
+        }
+      },
+
+      // Étape 3: Calculer la note moyenne et compter les avis
+      {
+        $addFields: {
+          averageRating: {
+            $cond: {
+              if: { $gt: [{ $size: '$reviews' }, 0] },
+              then: { $avg: '$reviews.rating' },
+              else: 0
+            }
+          },
+          reviewCount: { $size: '$reviews' }
+        }
+      },
+
+      // Étape 4: Projeter les champs nécessaires
+      {
+        $project: {
+          name: 1,
+          description: 1,
+          price: 1,
+          promotionalPrice: 1,
+          category: 1,
+          attributes: 1,
+          images: 1,
+          isActive: 1,
+          views: 1,
+          clicks: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          averageRating: 1,
+          reviewCount: 1
+        }
+      },
+
+      // Étape 5: Trier par date de création décroissante
+      { $sort: { createdAt: -1 } },
+
+      // Étape 6: Pagination
+      { $skip: skip },
+      { $limit: limit }
+    ];
+
+    // Compter le nombre total de documents (avec les mêmes filtres)
+    const countPipeline = [
+      { $match: filter },
+      { $count: 'total' }
+    ];
+
+    // Exécuter les deux pipelines
+    const [productsResult, countResult] = await Promise.all([
+      Product.aggregate(aggregationPipeline),
+      Product.aggregate(countPipeline)
+    ]);
+
+    const total = countResult[0]?.total || 0;
+
     res.status(200).json({
       success: true,
-      count: products.length,
+      count: productsResult.length,
       total,
       pagination: {
         page,
         limit,
         totalPages: Math.ceil(total / limit)
       },
-      data: products
+      data: productsResult
     });
   } catch (error: unknown) {
     res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });

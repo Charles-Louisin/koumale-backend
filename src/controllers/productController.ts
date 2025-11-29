@@ -360,20 +360,85 @@ export const getProductById = async (req: Request, res: Response): Promise<void>
   try {
     const { id } = req.params;
 
-    const product = await Product.findById(id).populate('vendor', 'businessName vendorSlug');
+    // Utiliser l'agrégation pour inclure les avis et calculer la note moyenne
+    const product = await Product.aggregate([
+      // Étape 1: Filtrer par ID
+      { $match: { _id: new Types.ObjectId(id) } },
 
-    if (!product) {
+      // Étape 2: Joindre avec les vendeurs
+      {
+        $lookup: {
+          from: 'vendors',
+          localField: 'vendor',
+          foreignField: '_id',
+          as: 'vendor'
+        }
+      },
+      { $unwind: '$vendor' },
+
+      // Étape 3: Joindre avec les avis pour calculer la note moyenne
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'product',
+          as: 'reviews'
+        }
+      },
+
+      // Étape 4: Calculer la note moyenne
+      {
+        $addFields: {
+          averageRating: {
+            $cond: {
+              if: { $gt: [{ $size: '$reviews' }, 0] },
+              then: { $avg: '$reviews.rating' },
+              else: 0
+            }
+          },
+          reviewCount: { $size: '$reviews' }
+        }
+      },
+
+      // Étape 5: Projeter les champs nécessaires
+      {
+        $project: {
+          name: 1,
+          description: 1,
+          price: 1,
+          promotionalPrice: 1,
+          category: 1,
+          attributes: 1,
+          images: 1,
+          isActive: 1,
+          views: 1,
+          clicks: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          vendor: {
+            businessName: '$vendor.businessName',
+            vendorSlug: '$vendor.vendorSlug',
+            address: '$vendor.address'
+          },
+          averageRating: 1,
+          reviewCount: 1
+        }
+      }
+    ]);
+
+    if (!product || product.length === 0) {
       res.status(404).json({ success: false, message: 'Produit non trouvé' });
       return;
     }
 
+    const productData = product[0];
+
     // Incrémenter le compteur de vues
-    product.views += 1;
-    await product.save();
+    await Product.findByIdAndUpdate(id, { $inc: { views: 1 } });
 
     res.status(200).json({
       success: true,
-      data: product
+      data: productData
     });
   } catch (error: unknown) {
     res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });
