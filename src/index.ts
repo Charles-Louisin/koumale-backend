@@ -14,6 +14,8 @@ import imageProxy from './routes/imageProxy';
 import corsOptions from './utils/corsOptions';
 
 // Configuration des variables d'environnement
+// console.log(JSON.stringify(process.env.GOOGLE_CLIENT_ID));
+// console.log(JSON.stringify(process.env.GOOGLE_CLIENT_SECRET));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();

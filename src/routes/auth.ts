@@ -1,7 +1,7 @@
 import express from 'express';
 import passport from 'passport';
 import { Strategy as GoogleStrategy, Profile } from 'passport-google-oauth20';
-import { register, login, registerVendor, getMe, approveVendor, rejectVendor, generateToken } from '../controllers/authController';
+import { register, login, registerVendor, getMe, approveVendor, rejectVendor, generateToken, verifyEmail, resendVerificationCode } from '../controllers/authController';
 import { protect, authorize } from '../middleware/auth';
 import { UserRole } from '../models/User';
 import User, { IUser } from '../models/User';
@@ -64,6 +64,8 @@ passport.deserializeUser(async (id: string, done: (error: Error | null, user?: I
 router.post('/register', register);
 router.post('/login', login);
 router.post('/register-vendor', registerVendor);
+router.post('/verify-email', verifyEmail);
+router.post('/resend-verification', resendVerificationCode);
 
 // Routes Google OAuth (toujours disponibles pour le développement)
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));

@@ -20,6 +20,9 @@ export interface IUser extends Document {
   googleId?: string;
   role: UserRole;
   status: UserStatus;
+  isEmailVerified: boolean;
+  emailVerificationCode?: string;
+  emailVerificationExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -68,6 +71,18 @@ const UserSchema = new Schema<IUser>(
       type: String,
       enum: Object.values(UserStatus),
       default: UserStatus.APPROVED
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false
+    },
+    emailVerificationCode: {
+      type: String,
+      select: false
+    },
+    emailVerificationExpires: {
+      type: Date,
+      select: false
     }
   },
   { timestamps: true }
