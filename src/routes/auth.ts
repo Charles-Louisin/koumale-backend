@@ -38,7 +38,8 @@ passport.use(new GoogleStrategy({
       firstName: profile.name?.givenName,
       lastName: profile.name?.familyName,
       role: UserRole.CLIENT,
-      status: 'approved'
+      status: 'approved',
+      isEmailVerified: true
     });
 
     return done(null, user);
@@ -68,9 +69,9 @@ router.post('/verify-email', verifyEmail);
 router.post('/resend-verification', resendVerificationCode);
 
 // Routes Google OAuth (toujours disponibles pour le développement)
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
 
-router.get('/google/callback', passport.authenticate('google', { failureRedirect: '/auth/login' }), async (req: express.Request, res: express.Response) => {
+router.get('/google/callback', passport.authenticate('google', { failureRedirect: '/auth/login', session: false }), async (req: express.Request, res: express.Response) => {
   try {
     const user = req.user as IUser;
     const token = generateToken(user.id);

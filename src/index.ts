@@ -1,9 +1,10 @@
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
 import mongoose from 'mongoose';
 import passport from 'passport';
+import session from 'express-session';
 import authRoutes from './routes/auth';
 import productRoutes from './routes/product';
 import vendorRoutes from './routes/vendor';
@@ -14,8 +15,9 @@ import imageProxy from './routes/imageProxy';
 import corsOptions from './utils/corsOptions';
 
 // Configuration des variables d'environnement
-// console.log(JSON.stringify(process.env.GOOGLE_CLIENT_ID));
-// console.log(JSON.stringify(process.env.GOOGLE_CLIENT_SECRET));
+console.log(JSON.stringify(process.env.GOOGLE_CLIENT_ID));
+console.log(JSON.stringify(process.env.RESEND_API_KEY))
+console.log(JSON.stringify(process.env.GOOGLE_CLIENT_SECRET));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
@@ -27,8 +29,17 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Session middleware
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // Set to true if using HTTPS
+}));
+
 // Initialiser Passport
 app.use(passport.initialize());
+app.use(passport.session());
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -54,7 +65,7 @@ app.get("/env", (req, res) => {
 
 // Connexion à MongoDB
 mongoose
-  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/vendtout')
+  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/koumale')
   .then(() => {
     console.log('Connexion à MongoDB établie avec succès');
     // Démarrer le serveur après la connexion à la base de données

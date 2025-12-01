@@ -1,4 +1,7 @@
+import dotenv from 'dotenv';
 import { Resend } from 'resend';
+dotenv.config();
+
 
 interface EmailOptions {
   to: string;
@@ -8,6 +11,7 @@ interface EmailOptions {
 }
 
 // Initialisation de Resend
+console.log("🔍 RESEND_API_KEY =", process.env.RESEND_API_KEY);
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Fonction pour envoyer un email
