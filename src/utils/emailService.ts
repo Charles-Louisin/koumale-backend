@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 interface EmailOptions {
   to: string;
@@ -7,34 +7,21 @@ interface EmailOptions {
   text?: string;
 }
 
-// Configuration du transporteur email
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false, // true pour 465, false pour autres ports
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-};
+// Initialisation de Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Fonction pour envoyer un email
 export const sendEmail = async (options: EmailOptions): Promise<void> => {
   try {
-    const transporter = createTransporter();
-
-    const mailOptions = {
-      from: `"${process.env.FROM_NAME || 'KOUMALE'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    const data = await resend.emails.send({
+      from: `${process.env.FROM_NAME || 'KOUMALE'} <${process.env.FROM_EMAIL || 'noreply@koumale.com'}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
       text: options.text,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email envoyé:', info.messageId);
+    console.log('Email envoyé:', data);
   } catch (error) {
     console.error('Erreur lors de l\'envoi de l\'email:', error);
     throw new Error('Erreur lors de l\'envoi de l\'email');
