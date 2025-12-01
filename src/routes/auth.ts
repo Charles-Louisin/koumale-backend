@@ -48,18 +48,18 @@ passport.use(new GoogleStrategy({
   }
 }));
 
-passport.serializeUser((user: any, done: (error: any, id?: any) => void) => {
-  done(null, user.id);
-});
+// passport.serializeUser((user: any, done: (error: any, id?: any) => void) => {
+//   done(null, user.id);
+// });
 
-passport.deserializeUser(async (id: string, done: (error: Error | null, user?: IUser | null) => void) => {
-  try {
-    const user = await User.findById(id);
-    done(null, user);
-  } catch (error) {
-    done(error as Error);
-  }
-});
+// passport.deserializeUser(async (id: string, done: (error: Error | null, user?: IUser | null) => void) => {
+//   try {
+//     const user = await User.findById(id);
+//     done(null, user);
+//   } catch (error) {
+//     done(error as Error);
+//   }
+// });
 
 // Routes publiques
 router.post('/register', register);
@@ -77,7 +77,7 @@ router.get('/google/callback', passport.authenticate('google', { failureRedirect
     const token = generateToken(user.id);
 
     // Rediriger vers le frontend avec le token
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}`);
+    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
   } catch (error) {
     res.redirect('/auth/login');
   }
