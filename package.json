@@ -1,7 +1,7 @@
 {
-  "name": "vendtout-backend",
+  "name": "koumale-backend",
   "version": "1.0.0",
-  "description": "Backend pour la plateforme Vendtout",
+  "description": "Backend pour la plateforme koumale",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

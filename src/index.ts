@@ -11,13 +11,14 @@ import vendorRoutes from './routes/vendor';
 import userRoutes from './routes/user';
 import categoriesRoutes from './routes/categories';
 import reviewRoutes from './routes/review';
+import cartRoutes from './routes/cart';
 import imageProxy from './routes/imageProxy';
 import corsOptions from './utils/corsOptions';
 
 // Configuration des variables d'environnement
-console.log(JSON.stringify(process.env.GOOGLE_CLIENT_ID));
-console.log(JSON.stringify(process.env.RESEND_API_KEY))
-console.log(JSON.stringify(process.env.GOOGLE_CLIENT_SECRET));
+// console.log(JSON.stringify(process.env.GOOGLE_CLI/ENT_ID));
+// console.log(JSON.stringify(process.env.RESEND_API_KEY))
+// console.log(JSON.stringify(process.env.GOOGLE_CLIENT_SECRET));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
@@ -47,6 +48,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoriesRoutes);
+app.use('/api/cart', cartRoutes);
 
 // Route pour le proxy d'images : permet de servir une URL locale avec extension
 // Le front enregistre l'URL distante via POST /api/image/register, puis récupère
@@ -56,7 +58,7 @@ app.use('/api/image', imageProxy);
 
 // Route de test
 app.get('/', (req, res) => {
-  res.send('API Vendtout fonctionne correctement');
+  res.send('API KOUMALE fonctionne correctement');
 });
 app.get("/env", (req, res) => {
   res.send({ node_env: process.env.NODE_ENV });

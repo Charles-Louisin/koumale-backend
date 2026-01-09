@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import User, { UserRole, UserStatus } from '../models/User';
+import Vendor from '../models/Vendor';
+import Product from '../models/Product';
 
 // GET /api/users
 // Réservé aux super admins
@@ -36,21 +38,91 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
 
     const finalFilter = Object.keys(search).length ? { $and: [filter, search] } : filter;
 
-    const [users, total] = await Promise.all([
-      User.find(finalFilter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .select('email firstName lastName role status createdAt'),
+    // Utiliser l'agrégation pour inclure les informations de boutique pour les vendeurs
+    const aggregationPipeline: any[] = [
+      { $match: finalFilter },
+      {
+        $lookup: {
+          from: 'vendors',
+          localField: '_id',
+          foreignField: 'user',
+          as: 'vendor'
+        }
+      },
+      {
+        $unwind: {
+          path: '$vendor',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          email: 1,
+          firstName: 1,
+          lastName: 1,
+          role: 1,
+          status: 1,
+          createdAt: 1,
+          vendor: {
+            _id: '$vendor._id',
+            businessName: '$vendor.businessName',
+            vendorSlug: '$vendor.vendorSlug'
+          }
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit }
+    ];
+
+    const [usersResult, total] = await Promise.all([
+      User.aggregate(aggregationPipeline),
       User.countDocuments(finalFilter),
     ]);
 
     res.status(200).json({
       success: true,
-      count: users.length,
+      count: usersResult.length,
       total,
       pagination: { page, limit, totalPages: Math.ceil(total / limit) },
-      data: users,
+      data: usersResult,
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });
+  }
+};
+
+// DELETE /api/users/:userId
+// Supprimer un utilisateur (réservé aux super admins)
+export const deleteUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    
+    // Récupérer l'utilisateur
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
+      return;
+    }
+    
+    // Si c'est un vendeur, supprimer aussi sa boutique et ses produits
+    if (user.role === UserRole.VENDOR) {
+      const vendor = await Vendor.findOne({ user: user._id });
+      if (vendor) {
+        // Supprimer tous les produits du vendeur
+        await Product.deleteMany({ vendor: vendor._id });
+        // Supprimer le profil vendeur
+        await Vendor.findByIdAndDelete(vendor._id);
+      }
+    }
+    
+    // Supprimer l'utilisateur
+    await User.findByIdAndDelete(userId);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Utilisateur supprimé avec succès'
     });
   } catch (error: unknown) {
     res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });

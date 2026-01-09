@@ -5,7 +5,9 @@ import {
   getVendorBySlug,
   updateVendor,
   getVendorStats,
-  getVendorProducts
+  getVendorProducts,
+  deleteVendor,
+  deleteVendorByAdmin
 } from '../controllers/vendorController';
 
 import {
@@ -51,6 +53,20 @@ router.get(
   protect,
   authorize(UserRole.VENDOR),
   getVendorStats
+);
+
+router.delete(
+  '/me',
+  protect,
+  authorize(UserRole.VENDOR),
+  deleteVendor
+);
+
+router.delete(
+  '/:vendorId',
+  protect,
+  authorize(UserRole.SUPER_ADMIN),
+  deleteVendorByAdmin
 );
 
 router.post('/:slug/reviews', protect, postVendorReview);

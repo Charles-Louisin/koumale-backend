@@ -1,7 +1,7 @@
 import express from 'express';
 import passport from 'passport';
 import { Strategy as GoogleStrategy, Profile } from 'passport-google-oauth20';
-import { register, login, registerVendor, getMe, approveVendor, rejectVendor, generateToken, verifyEmail, resendVerificationCode } from '../controllers/authController';
+import { register, login, registerVendor, getMe, approveVendor, rejectVendor, generateToken, verifyEmail, resendVerificationCode, updateUserPreferences } from '../controllers/authController';
 import { protect, authorize } from '../middleware/auth';
 import { UserRole } from '../models/User';
 import User, { IUser } from '../models/User';
@@ -111,6 +111,7 @@ router.post('/check-business-name', async (req: express.Request, res: express.Re
 
 // Routes protégées
 router.get('/me', protect, getMe);
+router.put('/preferences', protect, updateUserPreferences);
 router.put('/approve-vendor/:userId', protect, authorize(UserRole.SUPER_ADMIN), approveVendor);
 router.put('/reject-vendor/:userId', protect, authorize(UserRole.SUPER_ADMIN), rejectVendor);
 

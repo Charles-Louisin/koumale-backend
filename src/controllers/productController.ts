@@ -473,10 +473,17 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
     // Préparer les données de mise à jour
     const updateData = { ...req.body };
 
+    // Convertir le prix en nombre si fourni
+    if (updateData.price !== undefined) {
+      updateData.price = Number(updateData.price);
+    }
+
     // Si promotionalPrice est fourni et n'est pas vide, le convertir en nombre
     if (updateData.promotionalPrice !== undefined) {
       if (updateData.promotionalPrice === '' || updateData.promotionalPrice === null) {
-        updateData.promotionalPrice = undefined; // Supprimer le champ
+        // Supprimer le prix promotionnel
+        delete updateData.promotionalPrice;
+        product.promotionalPrice = undefined;
       } else {
         updateData.promotionalPrice = Number(updateData.promotionalPrice);
       }
@@ -489,12 +496,10 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Mettre à jour le produit
-    const updatedProduct = await Product.findByIdAndUpdate(
-      id,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    );
+    // Mettre à jour le produit en utilisant save() pour que les validateurs Mongoose fonctionnent correctement
+    // avec les nouvelles valeurs
+    Object.assign(product, updateData);
+    const updatedProduct = await product.save();
 
     res.status(200).json({
       success: true,

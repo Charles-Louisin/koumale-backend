@@ -307,6 +307,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
         lastName: user.lastName,
         role: user.role,
         status: user.status,
+        hideSecurityWarning: user.hideSecurityWarning,
         vendor: vendorInfo
       }
     });
@@ -345,6 +346,36 @@ export const approveVendor = async (req: Request, res: Response): Promise<void> 
         email: user.email,
         role: user.role,
         status: user.status
+      }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });
+  }
+};
+
+// Mettre à jour les préférences utilisateur
+export const updateUserPreferences = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as Request & { user: { id: string } }).user.id;
+    const { hideSecurityWarning } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
+      return;
+    }
+
+    if (typeof hideSecurityWarning === 'boolean') {
+      user.hideSecurityWarning = hideSecurityWarning;
+      await user.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Préférences mises à jour avec succès',
+      user: {
+        id: user._id,
+        hideSecurityWarning: user.hideSecurityWarning
       }
     });
   } catch (error: unknown) {

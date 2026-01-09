@@ -123,6 +123,10 @@ export const getVendors = async (req: Request, res: Response): Promise<void> => 
           reviewCount: 1,
           productCount: 1,
           user: {
+            _id: '$user._id',
+            email: '$user.email',
+            firstName: '$user.firstName',
+            lastName: '$user.lastName',
             status: '$user.status'
           }
         }
@@ -447,6 +451,84 @@ export const getVendorStats = async (req: Request, res: Response): Promise<void>
         totalClicks: totalClicks.length > 0 ? totalClicks[0].total : 0,
         topProducts
       }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });
+  }
+};
+
+// Supprimer un profil vendeur (par admin)
+export const deleteVendorByAdmin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { vendorId } = req.params;
+    
+    // Récupérer le vendeur
+    const vendor = await Vendor.findById(vendorId);
+    
+    if (!vendor) {
+      res.status(404).json({ success: false, message: 'Boutique non trouvée' });
+      return;
+    }
+    
+    // Récupérer l'utilisateur
+    const user = await User.findById(vendor.user);
+    if (!user) {
+      res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
+      return;
+    }
+    
+    // Supprimer tous les produits du vendeur
+    await Product.deleteMany({ vendor: vendor._id });
+    
+    // Supprimer le profil vendeur
+    await Vendor.findByIdAndDelete(vendor._id);
+    
+    // Remettre le rôle de l'utilisateur à client
+    user.role = UserRole.CLIENT;
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Boutique supprimée avec succès'
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });
+  }
+};
+
+// Supprimer un profil vendeur
+export const deleteVendor = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as Request & { user: { id: string, role?: UserRole } }).user.id;
+    
+    // Récupérer le vendeur
+    const vendor = await Vendor.findOne({ user: userId });
+    
+    if (!vendor) {
+      res.status(404).json({ success: false, message: 'Profil vendeur non trouvé' });
+      return;
+    }
+    
+    // Récupérer l'utilisateur
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
+      return;
+    }
+    
+    // Supprimer tous les produits du vendeur
+    await Product.deleteMany({ vendor: vendor._id });
+    
+    // Supprimer le profil vendeur
+    await Vendor.findByIdAndDelete(vendor._id);
+    
+    // Remettre le rôle de l'utilisateur à client
+    user.role = UserRole.CLIENT;
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Boutique supprimée avec succès'
     });
   } catch (error: unknown) {
     res.status(500).json({ success: false, message: error instanceof Error ? error.message : 'Une erreur est survenue' });

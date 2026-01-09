@@ -23,6 +23,7 @@ export interface IUser extends Document {
   isEmailVerified: boolean;
   emailVerificationCode?: string;
   emailVerificationExpires?: Date;
+  hideSecurityWarning?: boolean;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -83,6 +84,10 @@ const UserSchema = new Schema<IUser>(
     emailVerificationExpires: {
       type: Date,
       select: false
+    },
+    hideSecurityWarning: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }

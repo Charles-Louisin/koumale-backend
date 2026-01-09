@@ -48,6 +48,9 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
   }
 };
 
+// Alias pour compatibilité
+export const authenticateToken = protect;
+
 // Middleware pour restreindre l'accès selon le rôle
 export const authorize = (...roles: UserRole[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
