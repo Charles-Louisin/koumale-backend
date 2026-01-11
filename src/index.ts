@@ -13,6 +13,7 @@ import categoriesRoutes from './routes/categories';
 import reviewRoutes from './routes/review';
 import cartRoutes from './routes/cart';
 import imageProxy from './routes/imageProxy';
+import pushNotificationRoutes from './routes/pushNotification';
 import corsOptions from './utils/corsOptions';
 
 // Configuration des variables d'environnement
@@ -49,6 +50,7 @@ app.use('/api/vendors', vendorRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/cart', cartRoutes);
+app.use('/api/push', pushNotificationRoutes);
 
 // Route pour le proxy d'images : permet de servir une URL locale avec extension
 // Le front enregistre l'URL distante via POST /api/image/register, puis récupère
@@ -70,6 +72,14 @@ mongoose
   .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/koumale')
   .then(() => {
     console.log('Connexion à MongoDB établie avec succès');
+    
+    // Démarrer les tâches cron pour les notifications push
+    if (process.env.NODE_ENV !== 'test') {
+      import('./services/cronJobs').catch(err => 
+        console.error('Erreur lors du chargement des tâches cron:', err)
+      );
+    }
+    
     // Démarrer le serveur après la connexion à la base de données
     app.listen(PORT, () => {
       console.log(`Serveur démarré sur le port ${PORT}`);

@@ -5,6 +5,7 @@ import User, { UserRole, UserStatus } from '../models/User';
 import Vendor from '../models/Vendor';
 import { generateSlug } from '../utils/helpers';
 import { sendVerificationEmail } from '../utils/emailService';
+import { notifyAdminNewUser, notifyNewVendor } from '../services/pushNotificationService';
 
 // Fonction pour générer un token JWT
 export const generateToken = (userId: string | mongoose.Types.ObjectId): string => {
@@ -50,6 +51,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       console.error('Erreur lors de l\'envoi de l\'email de vérification:', emailError);
       // Ne pas échouer l'inscription si l'email ne peut pas être envoyé
     }
+
+    // Notifier les admins du nouvel utilisateur (en arrière-plan)
+    notifyAdminNewUser(user).catch(err => 
+      console.error('Erreur lors de l\'envoi de la notification nouveau utilisateur:', err)
+    );
 
     res.status(201).json({
       success: true,
@@ -258,6 +264,11 @@ export const registerVendor = async (req: Request, res: Response): Promise<void>
         coverImage,
         documents
       });
+
+      // Notifier les clients et admins du nouveau vendor (en arrière-plan)
+      notifyNewVendor(vendor).catch(err => 
+        console.error('Erreur lors de l\'envoi de la notification nouveau vendor:', err)
+      );
     }
 
     // Générer un token

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Product from '../models/Product';
 import Vendor from '../models/Vendor';
 import Review from '../models/Review';
+import { notifyProductReview } from '../services/pushNotificationService';
 
 // POST review for product
 export const postProductReview = async (req: Request, res: Response): Promise<void> => {
@@ -27,6 +28,11 @@ export const postProductReview = async (req: Request, res: Response): Promise<vo
       rating,
       comment: comment.trim()
     });
+
+    // Notifier le vendeur du nouveau review (en arrière-plan)
+    notifyProductReview(review, product).catch(err => 
+      console.error('Erreur lors de l\'envoi de la notification review:', err)
+    );
 
     res.status(201).json({ success: true, data: review });
   } catch (error) {

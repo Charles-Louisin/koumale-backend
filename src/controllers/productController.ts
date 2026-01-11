@@ -4,6 +4,7 @@ import Vendor from '../models/Vendor';
 import Review from '../models/Review';
 import { UserRole } from '../models/User';
 import { Types } from 'mongoose';
+import { notifyNewProduct } from '../services/pushNotificationService';
 
 // Créer un nouveau produit
 export const createProduct = async (req: Request, res: Response): Promise<void> => {
@@ -36,6 +37,11 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
       attributes: attributes || {},
       images: images || []
     });
+
+    // Notifier les clients du nouveau produit (en arrière-plan, ne pas bloquer la réponse)
+    notifyNewProduct(product).catch(err => 
+      console.error('Erreur lors de l\'envoi de la notification nouveau produit:', err)
+    );
 
     res.status(201).json({
       success: true,
